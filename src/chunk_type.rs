@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::{fmt, str};
 
 #[derive(PartialEq, Eq, Debug)]
-struct ChunkType {
+pub struct ChunkType {
     chunk_type: [u8; 4],
 }
 
@@ -46,7 +46,7 @@ impl Display for ChunkType {
 }
 
 impl ChunkType {
-    fn bytes(&self) -> [u8; 4] {
+    pub fn bytes(&self) -> [u8; 4] {
         self.chunk_type
     }
 
