@@ -17,15 +17,23 @@ impl TryFrom<&[u8]> for Chunk {
     fn try_from(value: &[u8]) -> Result<Self> {
         let (int_bytes, rest) = value.split_at(std::mem::size_of::<u32>());
         let length = u32::from_be_bytes(int_bytes.try_into().unwrap());
-        let chunk_type = ChunkType::try_from([rest[0], rest[1], rest[2], rest[3]]).unwrap();
-        let data = value[6..length as usize].to_vec();
-        let crc = u32::from_be_bytes([value[7 + length as usize], value[8 + length], value[9 + length], value[10 + length]]);
-        Ok(Self {
-            length,
-            chunk_type,
-            data,
-            crc,
-        })
+        let (chunk_type_slice, rest) = rest.split_at(4);
+        let chunk_type_slice: [u8;4] = chunk_type_slice.try_into().unwrap();
+        let chunk_type = ChunkType::try_from(chunk_type_slice).unwrap();
+        let (data_slice, rest) = rest.split_at(length as usize);
+        let data = data_slice.to_vec();
+        let crc = u32::from_be_bytes(rest.try_into().unwrap());
+        let checksum = crc32fast::hash(&[&chunk_type.bytes(), data.as_slice()].concat());
+        if crc == checksum {
+            Ok(Self {
+                length,
+                chunk_type,
+                data,
+                crc,
+            })
+        } else {
+            Err(Box::new(ChunkError::InvalidChecksum(crc, checksum)))
+        }
     }
 }
 
@@ -37,11 +45,12 @@ impl Display for Chunk {
 
 impl Chunk {
     fn new(chunk_type: ChunkType, data: Vec<u8>) -> Chunk {
+        let crc = crc32fast::hash(&[&chunk_type.bytes(), data.as_slice()].concat());
         Chunk {
             length: data.len() as u32,
             chunk_type,
             data,
-            crc: 0
+            crc,
         }
     }
 
@@ -84,12 +93,14 @@ impl Chunk {
 #[derive(Debug)]
 pub enum ChunkError {
     DataToStringError,
+    InvalidChecksum(u32, u32)
 }
 
 impl Display for ChunkError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChunkError::DataToStringError => write!(f, "An error occurred while trying to parse the data as a string.")
+            ChunkError::DataToStringError => write!(f, "An error occurred while trying to parse the data as a string."),
+            ChunkError::InvalidChecksum(expected, found) => write!(f, "Incorrect checksum, expected: {} but found: {}", expected, found),
         }
     }
 }
