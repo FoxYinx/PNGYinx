@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::{fmt, str};
+use crate::Error;
+use crate::Result;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct ChunkType {
@@ -8,35 +10,31 @@ pub struct ChunkType {
 }
 
 impl TryFrom<[u8; 4]> for ChunkType {
-    type Error = ChunkTypeError;
+    type Error = Error;
 
-    fn try_from(value: [u8; 4]) -> Result<Self, Self::Error> {
+    fn try_from(value: [u8; 4]) -> Result<Self> {
         let chunk = ChunkType {chunk_type: value};
-        if chunk.is_valid_for_creation() {
-            Ok(chunk)
-        } else {
-            Err(ChunkTypeError::Invalid)
+        match chunk.is_valid_for_creation() {
+            Ok(_) => Ok(chunk),
+            Err(e) => Err(e)
         }
     }
 }
 
 impl FromStr for ChunkType {
-    type Err = ChunkTypeError;
+    type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let values = s.as_bytes();
+        if s.len() != 4 {
+            return Err(Box::new(ChunkTypeDecodingError::BadLength(s.len())))
+        }
         let chunk = ChunkType {chunk_type: [values[0], values[1], values[2], values[3]]};
-        if chunk.is_valid_for_creation() {
-            Ok(chunk)
-        } else {
-            Err(ChunkTypeError::Invalid)
+        match chunk.is_valid_for_creation() {
+            Ok(_) => Ok(chunk),
+            Err(e) => Err(e)
         }
     }
-}
-
-#[derive(Debug)]
-pub enum ChunkTypeError {
-    Invalid,
 }
 
 impl Display for ChunkType {
@@ -62,13 +60,13 @@ impl ChunkType {
         true
     }
 
-    fn is_valid_for_creation(&self) -> bool {
+    fn is_valid_for_creation(&self) -> Result<bool> {
         for value in self.chunk_type {
             if !value.is_ascii_alphabetic() {
-                return false;
+                return Err(Box::new(ChunkTypeDecodingError::BadByte(value)));
             }
         }
-        true
+        Ok(true)
     }
 
     fn is_critical(&self) -> bool {
@@ -88,7 +86,22 @@ impl ChunkType {
     }
 }
 
+#[derive(Debug)]
+pub enum ChunkTypeDecodingError {
+    BadByte(u8),
+    BadLength(usize),
+}
 
+impl Display for ChunkTypeDecodingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ChunkTypeDecodingError::BadByte(byte) => write!(f, "A bad byte was found: {}", byte),
+            ChunkTypeDecodingError::BadLength(length) => write!(f, "Wrong length, length found: {}", length)
+        }
+    }
+}
+
+impl std::error::Error for ChunkTypeDecodingError {}
 
 #[cfg(test)]
 mod tests {
