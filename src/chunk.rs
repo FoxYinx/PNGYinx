@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
-use std::str::{from_utf8, Utf8Error};
+use std::str::from_utf8;
 use crate::chunk_type::ChunkType;
+use crate::Error;
+use crate::Result;
 
 pub struct Chunk {
     length: u32,
@@ -10,19 +12,20 @@ pub struct Chunk {
 }
 
 impl TryFrom<&[u8]> for Chunk {
-    type Error = ();
+    type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let length = value[0];
-        let chunk_type = ChunkType::try_from(value[1..5]).unwrap();
+    fn try_from(value: &[u8]) -> Result<Self> {
+        let (int_bytes, rest) = value.split_at(std::mem::size_of::<u32>());
+        let length = u32::from_be_bytes(int_bytes.try_into().unwrap());
+        let chunk_type = ChunkType::try_from([rest[0], rest[1], rest[2], rest[3]]).unwrap();
         let data = value[6..length as usize].to_vec();
-        let crc = value[7+length as usize];
-        Self {
+        let crc = u32::from_be_bytes([value[7 + length as usize], value[8 + length], value[9 + length], value[10 + length]]);
+        Ok(Self {
             length,
             chunk_type,
             data,
             crc,
-        }
+        })
     }
 }
 
@@ -58,12 +61,11 @@ impl Chunk {
         self.crc
     }
 
-    fn data_as_string(&self) -> Result<String, Utf8Error> {
+    fn data_as_string(&self) -> Result<String> {
         let string = from_utf8(self.data.as_slice());
-        if string.is_ok() {
-            Ok(string.unwrap().to_string())
-        } else {
-            Err(string.err().unwrap())
+        match string {
+            Ok(text) => Ok(text.to_string()),
+            Err(_) => Err(Box::new(ChunkError::DataToStringError)),
         }
     }
 
@@ -71,13 +73,28 @@ impl Chunk {
         let result: Vec<u8> = self.length()
             .to_be_bytes()
             .iter()
-            .chain(self.chunk_type.bytes())
+            .chain(&self.chunk_type.bytes())
             .chain(self.data.iter())
             .copied()
             .collect();
         result
     }
 }
+
+#[derive(Debug)]
+pub enum ChunkError {
+    DataToStringError,
+}
+
+impl Display for ChunkError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChunkError::DataToStringError => write!(f, "An error occurred while trying to parse the data as a string.")
+        }
+    }
+}
+
+impl std::error::Error for ChunkError {}
 
 #[cfg(test)]
 mod tests {
