@@ -44,7 +44,7 @@ impl Display for Chunk {
 }
 
 impl Chunk {
-    fn new(chunk_type: ChunkType, data: Vec<u8>) -> Chunk {
+    pub fn new(chunk_type: ChunkType, data: Vec<u8>) -> Chunk {
         let crc = crc32fast::hash(&[&chunk_type.bytes(), data.as_slice()].concat());
         Chunk {
             length: data.len() as u32,
@@ -58,7 +58,7 @@ impl Chunk {
         self.length
     }
 
-    fn chunk_type(&self) -> &ChunkType {
+    pub fn chunk_type(&self) -> &ChunkType {
         &self.chunk_type
     }
 
@@ -70,7 +70,7 @@ impl Chunk {
         self.crc
     }
 
-    fn data_as_string(&self) -> Result<String> {
+    pub fn data_as_string(&self) -> Result<String> {
         let string = from_utf8(self.data.as_slice());
         match string {
             Ok(text) => Ok(text.to_string()),
@@ -78,7 +78,7 @@ impl Chunk {
         }
     }
 
-    fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         let result: Vec<u8> = self.length()
             .to_be_bytes()
             .iter()
@@ -235,4 +235,3 @@ mod tests {
         let _chunk_string = format!("{}", chunk);
     }
 }
-
