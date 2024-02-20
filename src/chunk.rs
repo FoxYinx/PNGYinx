@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::str::from_utf8;
+use crate::chunk::ChunkError::{InvalidChecksum, DataToStringError};
 use crate::chunk_type::ChunkType;
 use crate::Error;
 use crate::Result;
@@ -22,7 +23,8 @@ impl TryFrom<&[u8]> for Chunk {
         let chunk_type = ChunkType::try_from(chunk_type_slice).unwrap();
         let (data_slice, rest) = rest.split_at(length as usize);
         let data = data_slice.to_vec();
-        let crc = u32::from_be_bytes(rest.try_into().unwrap());
+        let (crc_bytes, _useless) = rest.split_at(std::mem::size_of::<u32>());
+        let crc = u32::from_be_bytes(crc_bytes.try_into().unwrap());
         let checksum = crc32fast::hash(&[&chunk_type.bytes(), data.as_slice()].concat());
         if crc == checksum {
             Ok(Self {
@@ -32,7 +34,7 @@ impl TryFrom<&[u8]> for Chunk {
                 crc,
             })
         } else {
-            Err(Box::new(ChunkError::InvalidChecksum(crc, checksum)))
+            Err(Box::new(InvalidChecksum(crc, checksum)))
         }
     }
 }
@@ -54,7 +56,7 @@ impl Chunk {
         }
     }
 
-    fn length(&self) -> u32 {
+    pub fn length(&self) -> u32 {
         self.length
     }
 
@@ -74,7 +76,7 @@ impl Chunk {
         let string = from_utf8(self.data.as_slice());
         match string {
             Ok(text) => Ok(text.to_string()),
-            Err(_) => Err(Box::new(ChunkError::DataToStringError)),
+            Err(_) => Err(Box::new(DataToStringError)),
         }
     }
 
@@ -84,6 +86,7 @@ impl Chunk {
             .iter()
             .chain(&self.chunk_type.bytes())
             .chain(self.data.iter())
+            .chain(self.crc.to_be_bytes().iter())
             .copied()
             .collect();
         result
@@ -99,8 +102,8 @@ pub enum ChunkError {
 impl Display for ChunkError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChunkError::DataToStringError => write!(f, "An error occurred while trying to parse the data as a string."),
-            ChunkError::InvalidChecksum(expected, found) => write!(f, "Incorrect checksum, expected: {} but found: {}", expected, found),
+            DataToStringError => write!(f, "An error occurred while trying to parse the data as a string."),
+            InvalidChecksum(expected, found) => write!(f, "Incorrect checksum, expected: {} but found: {}", expected, found),
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::{fmt, str};
+use crate::chunk_type::ChunkTypeDecodingError::{BadByte, BadLength};
 use crate::Error;
 use crate::Result;
 
@@ -27,7 +28,7 @@ impl FromStr for ChunkType {
     fn from_str(s: &str) -> Result<Self> {
         let values = s.as_bytes();
         if s.len() != 4 {
-            return Err(Box::new(ChunkTypeDecodingError::BadLength(s.len())))
+            return Err(Box::new(BadLength(s.len())))
         }
         let chunk = ChunkType {chunk_type: [values[0], values[1], values[2], values[3]]};
         match chunk.is_valid_for_creation() {
@@ -63,7 +64,7 @@ impl ChunkType {
     fn is_valid_for_creation(&self) -> Result<bool> {
         for value in self.chunk_type {
             if !value.is_ascii_alphabetic() {
-                return Err(Box::new(ChunkTypeDecodingError::BadByte(value)));
+                return Err(Box::new(BadByte(value)));
             }
         }
         Ok(true)
@@ -95,8 +96,8 @@ pub enum ChunkTypeDecodingError {
 impl Display for ChunkTypeDecodingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ChunkTypeDecodingError::BadByte(byte) => write!(f, "A bad byte was found: {}", byte),
-            ChunkTypeDecodingError::BadLength(length) => write!(f, "Wrong length, length found: {}", length)
+            BadByte(byte) => write!(f, "A bad byte was found: {}", byte),
+            BadLength(length) => write!(f, "Wrong length, length found: {}", length)
         }
     }
 }

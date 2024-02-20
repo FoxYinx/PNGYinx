@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use crate::chunk::Chunk;
 use crate::Error;
+use crate::png::PngError::{NonExistantChunk, IncorrectHeader};
 use crate::Result;
 
 pub struct Png {
@@ -21,7 +22,11 @@ impl Png {
     }
 
     fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
-        todo!()
+        let index = self.chunks.iter().position(|chunk| chunk.chunk_type().to_string().as_str() == chunk_type);
+        match index {
+            Some(chunk) => Ok(self.chunks.remove(chunk)),
+            None => Err(Box::new(NonExistantChunk))
+        }
     }
 
     fn header(&self) -> &[u8; 8] {
@@ -33,11 +38,15 @@ impl Png {
     }
 
     fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
-        todo!()
+        self.chunks.iter().find(|&chunk| chunk.chunk_type().to_string().as_str() == chunk_type)
     }
 
     fn as_bytes(&self) -> Vec<u8> {
-        todo!()
+        let mut bytes = Self::STANDARD_HEADER.to_vec();
+        for chunk in &self.chunks {
+            bytes.extend(chunk.as_bytes())
+        }
+        bytes
     }
 }
 
@@ -45,7 +54,27 @@ impl TryFrom<&[u8]> for Png {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self> {
-        todo!()
+        let (header, rest) = value.split_at(8);
+        if header != Self::STANDARD_HEADER {
+            return Err(Box::new(IncorrectHeader));
+        }
+        let mut bytes = rest.to_vec();
+        let mut chunks = Vec::new();
+        while !bytes.is_empty() {
+            let chunky = Chunk::try_from(bytes.as_slice());
+            let length;
+            match chunky {
+                Ok(chunky) => {
+                    length = chunky.length() + 12;
+                    chunks.push(chunky);
+                },
+                Err(e) => return Err(e),
+            }
+            bytes.drain(0..length as usize);
+        }
+        Ok(Self {
+            chunks
+        })
     }
 }
 
@@ -58,12 +87,14 @@ impl Display for Png {
 #[derive(Debug)]
 pub enum PngError {
     IncorrectHeader,
+    NonExistantChunk
 }
 
 impl Display for PngError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            PngError::IncorrectHeader => write!(f ,"An incorrect header was found!")
+            IncorrectHeader => write!(f ,"An incorrect header was found!"),
+            NonExistantChunk => write!(f, "The requested chunk doesn't exist!"),
         }
     }
 }
