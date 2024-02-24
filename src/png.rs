@@ -17,11 +17,11 @@ impl Png {
         }
     }
 
-    fn append_chunk(&mut self, chunk: Chunk) {
+    pub fn append_chunk(&mut self, chunk: Chunk) {
         self.chunks.push(chunk)
     }
 
-    fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
+    pub fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
         let index = self.chunks.iter().position(|chunk| chunk.chunk_type().to_string().as_str() == chunk_type);
         match index {
             Some(chunk) => Ok(self.chunks.remove(chunk)),
@@ -37,11 +37,11 @@ impl Png {
         self.chunks.as_slice()
     }
 
-    fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
+    pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
         self.chunks.iter().find(|&chunk| chunk.chunk_type().to_string().as_str() == chunk_type)
     }
 
-    fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         let mut bytes = Self::STANDARD_HEADER.to_vec();
         for chunk in &self.chunks {
             bytes.extend(chunk.as_bytes())
