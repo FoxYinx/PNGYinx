@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use clap::{arg, Command};
+use crate::commands::{decode, encode, remove};
 
 fn cli() -> Command {
     Command::new("pngyinx")
@@ -34,25 +35,35 @@ pub fn args_processing() {
     
     match matches.subcommand() { 
         Some(("encode", sub_matches)) => {
+            let path = sub_matches.get_one::<String>("PATH").expect("required");
+            let key = sub_matches.get_one::<String>("CHUNKTYPE").expect("required");
+            let message = sub_matches.get_one::<String>("MESSAGE").expect("required");
             println!(
                 "Encoding your secret from {} with key {}",
-                sub_matches.get_one::<String>("PATH").expect("required"),
-                sub_matches.get_one::<String>("CHUNKTYPE").expect("required")
+                path,
+                key,
             );
+            encode(path, key, message);
         },
         Some(("decode", sub_matches)) => {
+            let path = sub_matches.get_one::<String>("PATH").expect("required");
+            let key = sub_matches.get_one::<String>("CHUNKTYPE").expect("required");
             println!(
                 "Decoding your secret from {} with key {}",
-                sub_matches.get_one::<String>("PATH").expect("required"),
-                sub_matches.get_one::<String>("CHUNKTYPE").expect("required")
+                path,
+                key,
             );
+            decode(path, key);
         },
         Some(("remove", sub_matches)) => {
+            let path = sub_matches.get_one::<String>("PATH").expect("required");
+            let key = sub_matches.get_one::<String>("CHUNKTYPE").expect("required");
             println!(
                 "Removing secret message from {} with key {}",
-                sub_matches.get_one::<String>("PATH").expect("required"),
-                sub_matches.get_one::<String>("CHUNKTYPE").expect("required")
-            )
+                path,
+                key,
+            );
+            remove(path, key);
         },
         Some((ext, sub_matches)) => {
             let args = sub_matches
